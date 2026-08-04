@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">unscroll</string>
+    <string name="service_label">unscroll blocker</string>
+    <string name="service_summary">Closes short-video feeds and enforces your daily app limits.</string>
+    <string name="service_description">unscroll watches the screen for short-video feeds (Reels, Shorts, TikTok, Spotlight) and backs out of them. It also tracks how long you spend in the apps you have put on a daily limit. Nothing leaves your phone.</string>
+</resources>
