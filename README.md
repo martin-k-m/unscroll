@@ -1,5 +1,10 @@
 # unscroll
 
+[![build](https://github.com/martin-k-m/unscroll/actions/workflows/build.yml/badge.svg)](https://github.com/martin-k-m/unscroll/actions/workflows/build.yml)
+[![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=fff)](https://www.android.com)
+[![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=fff)](https://kotlinlang.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 An Android app that closes short-video feeds for you. Open Reels, Shorts, TikTok or Spotlight
 and it backs you out within a moment, with a short curtain over the screen so nothing you flick
 lands on the feed underneath. It also enforces daily time budgets per app.
