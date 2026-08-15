@@ -1,6 +1,6 @@
 # Contributing to unscroll
 
-Thanks for taking a look. unscroll has one hard promise — **nothing leaves the
+Thanks for taking a look. unscroll has one hard promise, **nothing leaves the
 phone**: no accounts, no network calls, no analytics. Every change is measured
 against that first.
 
@@ -16,7 +16,7 @@ cd unscroll
 ```
 
 Install the resulting debug APK on a device, then grant the accessibility
-service in Settings — the feed blocking depends on it.
+service in Settings, since the feed blocking depends on it.
 
 ## Ground rules
 

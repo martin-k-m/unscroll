@@ -29,7 +29,9 @@ Rules ship for:
 | Reddit video feed | com.reddit.frontpage |
 | TikTok, whole app | com.zhiliaoapp.musically |
 
-Each one is a toggle. Explore and the TikTok whole-app block are off by default.
+Each one is a toggle. Everything except the TikTok whole-app block is on by
+default, Instagram Explore included, since a whole-app block is a bigger
+decision than closing one feed.
 
 **Daily limits.** Optional. Set a budget per app and the service sends you Home once the day's
 foreground time crosses it. Time comes from `UsageStatsManager` events, computed from local
@@ -40,7 +42,9 @@ the service off in Accessibility settings, which takes enough taps to count as a
 
 ## Install
 
-Grab the APK from the latest [build run](../../actions/workflows/build.yml) artifact, or build it:
+There are no signed releases yet. Grab the debug APK from the latest
+[build run](../../actions/workflows/build.yml) artifact, which needs a GitHub
+login to download and expires after 90 days, or build it yourself:
 
 ```bash
 ./gradlew :app:assembleDebug
