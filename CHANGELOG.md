@@ -10,6 +10,12 @@ produced by CI.
 
 ## Unreleased
 
+### Added
+- `scripts/check-no-network.sh`, run by CI, which fails the build if the app
+  gains `android.permission.INTERNET` or references a networking API. CI checks
+  the merged manifest, so a permission contributed by a dependency is caught.
+  The no-network claim previously rested on nothing but the file's contents.
+
 ### Fixed
 - The README claimed Instagram Explore was off by default. It is on; only the
   TikTok whole-app block is off.

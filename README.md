@@ -11,6 +11,12 @@ lands on the feed underneath. It also enforces daily time budgets per app.
 
 Kotlin, Jetpack Compose, no accounts, no network calls, no analytics. Nothing leaves the phone.
 
+That last claim is checked rather than asserted. The app does not request
+`android.permission.INTERNET`, and without it the platform refuses the socket
+whatever the code asks for. `scripts/check-no-network.sh` fails the build if the
+permission appears, and CI runs it against the *merged* manifest, after any
+dependency has had its chance to contribute one.
+
 ## What it actually does
 
 **Feed blocking.** An accessibility service watches window changes. When the visible screen
