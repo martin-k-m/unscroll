@@ -1,66 +1,42 @@
 #!/usr/bin/env bash
-# Fails if unscroll could reach the network.
+# Fails if the app could reach the network. Without INTERNET the platform refuses
+# the socket, so the permission is the whole of the README's privacy claim.
 #
-# The README says nothing leaves the phone. That claim rests entirely on the app
-# not holding android.permission.INTERNET, because without it the platform
-# refuses the socket no matter what the code asks for. Nothing asserted it, so
-# the claim was a promise about a file anyone could edit.
+# The source manifest is not enough on its own: manifest merging lets a
+# dependency contribute a permission, and the merged manifest is what ships. CI
+# passes --merged for that.
 #
-# Checking the source manifest alone is not enough. Manifest merging lets any
-# library contribute a <uses-permission>, so a dependency added later can grant
-# INTERNET without a line of this project's XML changing. The merged manifest is
-# the one that ships, so that is the one worth checking, and CI passes it in.
-#
-# Usage:
-#   scripts/check-no-network.sh                     # source manifest and code
-#   scripts/check-no-network.sh --merged <path>     # also the merged manifest
+# Usage: check-no-network.sh [--merged <path>]
 set -euo pipefail
-
 cd "$(dirname "$0")/.."
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 merged=""
-while [ $# -gt 0 ]; do
-    case "$1" in
-        --merged)
-            [ $# -ge 2 ] || fail "--merged needs a path"
-            merged="$2"
-            shift 2
-            ;;
-        *) fail "unknown argument: $1" ;;
-    esac
-done
+case "${1-}" in
+    --merged) merged="${2-}"; [ -n "$merged" ] || fail "--merged needs a path" ;;
+    "") ;;
+    *) fail "unknown argument: $1" ;;
+esac
 
-source_manifest="app/src/main/AndroidManifest.xml"
-[ -f "$source_manifest" ] || fail "no manifest at $source_manifest"
+check() {
+    [ -f "$1" ] || fail "no manifest at $1"
+    ! grep -q "android.permission.INTERNET" "$1" || fail "$1 grants INTERNET"
+    echo "ok: $1 does not grant INTERNET"
+}
 
-if grep -q "android.permission.INTERNET" "$source_manifest"; then
-    fail "$source_manifest declares INTERNET, so the no-network claim is false"
-fi
-echo "ok: $source_manifest does not declare INTERNET"
+check app/src/main/AndroidManifest.xml
 
-# Network use without the permission throws at runtime rather than silently
-# working, so this is about catching the intent early, not about the guarantee.
-# It is deliberately a small list of the ways a request actually gets made.
-offenders=$(grep -rnE \
-    'java\.net\.(URL|Socket|HttpURLConnection)|HttpURLConnection|okhttp3|retrofit2|Volley|java\.net\.URLConnection|WebView' \
-    --include="*.kt" --include="*.java" app/src/main 2>/dev/null || true)
-if [ -n "$offenders" ]; then
-    echo "$offenders" >&2
+# Networking without the permission throws rather than silently working, so this
+# catches the intent early. It is not what makes the claim true.
+if grep -rnE 'java\.net\.(URL|Socket|URLConnection|HttpURLConnection)|okhttp3|retrofit2|Volley|WebView' \
+        --include="*.kt" --include="*.java" app/src/main; then
     fail "source references a networking API"
 fi
 echo "ok: no networking API referenced in app/src/main"
 
 if [ -n "$merged" ]; then
-    # Required, not optional. A missing file here means the build layout moved
-    # and this check silently stopped checking, which is worse than failing.
-    [ -f "$merged" ] || fail "merged manifest not found at $merged"
-    if grep -q "android.permission.INTERNET" "$merged"; then
-        fail "the merged manifest grants INTERNET, so a dependency contributed it"
-    fi
-    echo "ok: $merged does not grant INTERNET"
+    check "$merged"
 else
-    echo "note: no merged manifest checked, so this run cannot see a permission"
-    echo "      a dependency contributes. CI passes --merged for that."
+    echo "note: no merged manifest checked, so a dependency's permission would be missed"
 fi
