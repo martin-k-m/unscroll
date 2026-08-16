@@ -11,6 +11,12 @@ lands on the feed underneath. It also enforces daily time budgets per app.
 
 Kotlin, Jetpack Compose, no accounts, no network calls, no analytics. Nothing leaves the phone.
 
+That last claim is checked rather than asserted. The app does not request
+`android.permission.INTERNET`, and without it the platform refuses the socket
+whatever the code asks for. `scripts/check-no-network.sh` fails the build if the
+permission appears, and CI runs it against the *merged* manifest, after any
+dependency has had its chance to contribute one.
+
 ## What it actually does
 
 **Feed blocking.** An accessibility service watches window changes. When the visible screen
@@ -29,7 +35,9 @@ Rules ship for:
 | Reddit video feed | com.reddit.frontpage |
 | TikTok, whole app | com.zhiliaoapp.musically |
 
-Each one is a toggle. Explore and the TikTok whole-app block are off by default.
+Each one is a toggle. Everything except the TikTok whole-app block is on by
+default, Instagram Explore included, since a whole-app block is a bigger
+decision than closing one feed.
 
 **Daily limits.** Optional. Set a budget per app and the service sends you Home once the day's
 foreground time crosses it. Time comes from `UsageStatsManager` events, computed from local
@@ -40,7 +48,9 @@ the service off in Accessibility settings, which takes enough taps to count as a
 
 ## Install
 
-Grab the APK from the latest [build run](../../actions/workflows/build.yml) artifact, or build it:
+There are no signed releases yet. Grab the debug APK from the latest
+[build run](../../actions/workflows/build.yml) artifact, which needs a GitHub
+login to download and expires after 90 days, or build it yourself:
 
 ```bash
 ./gradlew :app:assembleDebug
