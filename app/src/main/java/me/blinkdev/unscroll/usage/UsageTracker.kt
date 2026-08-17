@@ -5,7 +5,6 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Process
-import java.util.Calendar
 
 /**
  * Foreground time per package for the current calendar day.
@@ -32,40 +31,23 @@ class UsageTracker(context: Context) {
 
     /** Milliseconds spent in the foreground today, keyed by package name. */
     fun foregroundMillisToday(now: Long = System.currentTimeMillis()): Map<String, Long> {
-        val start = startOfDay(now)
-        val totals = mutableMapOf<String, Long>()
-        val lastResumed = mutableMapOf<String, Long>()
-
-        val events = manager.queryEvents(start, now)
+        val events = manager.queryEvents(UsageMath.startOfDay(now), now)
         val event = UsageEvents.Event()
+        val transitions = mutableListOf<ForegroundEvent>()
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             val pkg = event.packageName ?: continue
             when (event.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED -> lastResumed[pkg] = event.timeStamp
+                UsageEvents.Event.ACTIVITY_RESUMED ->
+                    transitions += ForegroundEvent(pkg, event.timeStamp, resumed = true)
                 UsageEvents.Event.ACTIVITY_PAUSED,
-                UsageEvents.Event.ACTIVITY_STOPPED -> {
-                    val resumedAt = lastResumed.remove(pkg) ?: continue
-                    totals[pkg] = (totals[pkg] ?: 0L) + (event.timeStamp - resumedAt)
-                }
+                UsageEvents.Event.ACTIVITY_STOPPED ->
+                    transitions += ForegroundEvent(pkg, event.timeStamp, resumed = false)
             }
         }
-
-        // Whatever is on screen right now has been resumed but not paused yet.
-        lastResumed.forEach { (pkg, resumedAt) ->
-            totals[pkg] = (totals[pkg] ?: 0L) + (now - resumedAt)
-        }
-        return totals
+        return UsageMath.foregroundMillis(transitions, now)
     }
 
     fun minutesToday(packageName: String, now: Long = System.currentTimeMillis()): Int =
         ((foregroundMillisToday(now)[packageName] ?: 0L) / 60_000L).toInt()
-
-    private fun startOfDay(now: Long): Long = Calendar.getInstance().apply {
-        timeInMillis = now
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
 }

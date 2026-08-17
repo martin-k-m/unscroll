@@ -100,6 +100,26 @@ object BlockRules {
     fun surfacesFor(packageName: String): List<Surface> =
         surfaces.filter { it.packageName == packageName }
 
+    /**
+     * The surface to block on the current screen, or null.
+     *
+     * The two signal lookups are passed in because reading them needs an accessibility node
+     * tree. Rule strings are handed to them verbatim: whatever "matches" means for a text is
+     * the caller's business, not this function's.
+     */
+    fun match(
+        packageName: String,
+        enabledSurfaceIds: Set<String>,
+        hasViewId: (String) -> Boolean,
+        hasSelectedText: (String) -> Boolean,
+    ): Surface? {
+        val candidates = surfacesFor(packageName).filter { it.id in enabledSurfaceIds }
+        candidates.firstOrNull { it.wholeApp }?.let { return it }
+        return candidates.firstOrNull { surface ->
+            surface.viewIds.any(hasViewId) || surface.texts.any(hasSelectedText)
+        }
+    }
+
     fun labelFor(packageName: String): String =
         limitCandidates.firstOrNull { it.first == packageName }?.second ?: packageName
 }
