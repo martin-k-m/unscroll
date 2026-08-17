@@ -80,6 +80,22 @@ class UsageMathFoldTest {
     }
 
     @Test
+    fun `an app on screen since before midnight contributes nothing`() {
+        // The other half of the hole above, and the worse half. There the session ends inside
+        // the window and is dropped. Here it has not ended, so the package produces no event in
+        // the window at all and the trailing pass over what is still on screen has nothing to
+        // attribute time to. IG has been foreground since before midnight and is absent below,
+        // while YT, resumed inside the window, is counted. Starting a dropped session at
+        // midnight would close the first hole and leave this one open, because the fix there is
+        // reached from a pause event that never arrives here.
+        val totals = UsageMath.foregroundMillis(
+            listOf(resumed(YT, 2 * MINUTE), ended(YT, 3 * MINUTE)),
+            now = 10 * MINUTE,
+        )
+        assertEquals(mapOf(YT to MINUTE), totals)
+    }
+
+    @Test
     fun `a stop ends a session the same way a pause does`() {
         val paused = UsageMath.foregroundMillis(
             listOf(resumed(IG, 0), ForegroundEvent(IG, 2 * MINUTE, resumed = false)),
