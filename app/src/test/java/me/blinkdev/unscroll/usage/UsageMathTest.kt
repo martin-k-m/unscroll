@@ -72,27 +72,59 @@ class UsageMathFoldTest {
     }
 
     @Test
-    fun `a pause with no matching resume contributes nothing`() {
-        // This is what an app foregrounded before midnight looks like: the resume falls outside
-        // the query window, so the whole session is dropped rather than counted from midnight.
-        val totals = UsageMath.foregroundMillis(listOf(ended(IG, 8 * MINUTE)), now = 10 * MINUTE)
-        assertEquals(emptyMap<String, Long>(), totals)
+    fun `a session that crossed midnight counts from midnight, not from nothing`() {
+        // The caller now hands over events from before the window, so the resume is seen. The
+        // session ran 8 minutes in total; only the 5 after midnight belong to today.
+        val midnight = 10 * MINUTE
+        val totals = UsageMath.foregroundMillis(
+            listOf(resumed(IG, midnight - 3 * MINUTE), ended(IG, midnight + 5 * MINUTE)),
+            now = midnight + 8 * MINUTE,
+            windowStart = midnight,
+        )
+        assertEquals(mapOf(IG to 5 * MINUTE), totals)
     }
 
     @Test
-    fun `an app on screen since before midnight contributes nothing`() {
-        // The other half of the hole above, and the worse half. There the session ends inside
-        // the window and is dropped. Here it has not ended, so the package produces no event in
-        // the window at all and the trailing pass over what is still on screen has nothing to
-        // attribute time to. IG has been foreground since before midnight and is absent below,
-        // while YT, resumed inside the window, is counted. Starting a dropped session at
-        // midnight would close the first hole and leave this one open, because the fix there is
-        // reached from a pause event that never arrives here.
+    fun `an app still on screen since before midnight counts from midnight up to now`() {
+        // The other half, and the worse one before the fix: no pause has arrived, so the only
+        // thing that can credit it is the trailing pass over what is still on screen. Clipping
+        // to the window start is what makes that pass right for a resume that predates it.
+        val midnight = 10 * MINUTE
         val totals = UsageMath.foregroundMillis(
-            listOf(resumed(YT, 2 * MINUTE), ended(YT, 3 * MINUTE)),
-            now = 10 * MINUTE,
+            listOf(
+                resumed(IG, midnight - 40 * MINUTE),
+                resumed(YT, midnight + 2 * MINUTE),
+                ended(YT, midnight + 3 * MINUTE),
+            ),
+            now = midnight + 6 * MINUTE,
+            windowStart = midnight,
         )
-        assertEquals(mapOf(YT to MINUTE), totals)
+        assertEquals(mapOf(IG to 6 * MINUTE, YT to MINUTE), totals)
+    }
+
+    @Test
+    fun `a session entirely before midnight contributes nothing to today`() {
+        // The wider query will surface yesterday's finished sessions too. They must clip to
+        // zero, and stay in the map at zero, rather than leak into today's total.
+        val midnight = 10 * MINUTE
+        val totals = UsageMath.foregroundMillis(
+            listOf(resumed(IG, midnight - 9 * MINUTE), ended(IG, midnight - MINUTE)),
+            now = midnight + 4 * MINUTE,
+            windowStart = midnight,
+        )
+        assertEquals(mapOf(IG to 0L), totals)
+    }
+
+    @Test
+    fun `a pause whose resume was never seen still contributes nothing`() {
+        // If the lookback was not long enough to reach the resume, there is nothing honest to
+        // credit. Guessing a start would over-count; nothing is the safe direction.
+        val totals = UsageMath.foregroundMillis(
+            listOf(ended(IG, 8 * MINUTE)),
+            now = 10 * MINUTE,
+            windowStart = 5 * MINUTE,
+        )
+        assertEquals(emptyMap<String, Long>(), totals)
     }
 
     @Test
