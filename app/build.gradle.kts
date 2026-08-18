@@ -35,6 +35,10 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        unitTests.all { it.useJUnitPlatform() }
+    }
 }
 
 dependencies {
@@ -49,4 +53,6 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.datastore.preferences)
     debugImplementation(libs.androidx.ui.tooling)
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }

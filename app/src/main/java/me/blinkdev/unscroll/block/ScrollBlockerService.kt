@@ -91,15 +91,16 @@ class ScrollBlockerService : AccessibilityService() {
 
         val root = rootInActiveWindow ?: return null
         try {
-            for (surface in candidates) {
-                if (surface.viewIds.any { root.hasViewId(it) }) return surface
-                if (surface.texts.any { root.hasSelectedText(it) }) return surface
-            }
+            return BlockRules.match(
+                packageName,
+                snapshot.enabledSurfaces,
+                { root.hasViewId(it) },
+                { root.hasSelectedText(it) },
+            )
         } finally {
             @Suppress("DEPRECATION")
             root.recycle()
         }
-        return null
     }
 
     private fun block(packageName: String, reason: String, message: String, now: Long) {
