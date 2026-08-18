@@ -17,6 +17,11 @@ produced by CI.
   The no-network claim previously rested on nothing but the file's contents.
 
 ### Fixed
+- A daily limit under-counted any session that crossed midnight. One that ended
+  after midnight was dropped entirely, and one still on screen produced no event
+  in the query window at all and so counted as nothing until it ended. Both were
+  the overnight case a daily limit exists for. Events are now read from a day
+  before midnight and clipped to it, so such a session counts from midnight.
 - The README claimed Instagram Explore was off by default. It is on; only the
   TikTok whole-app block is off.
 - The install section no longer implies the CI artifact is a release. It is a

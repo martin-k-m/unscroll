@@ -29,9 +29,17 @@ class UsageTracker(context: Context) {
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
-    /** Milliseconds spent in the foreground today, keyed by package name. */
+    /**
+     * Milliseconds spent in the foreground today, keyed by package name.
+     *
+     * The query starts a day before midnight rather than at it, so a session that was
+     * already on screen at midnight has its resume inside the window. Without that the
+     * platform never mentions the app at all and it counts as nothing until it ends. The
+     * accounting then clips every session to midnight, so what comes back is still today's.
+     */
     fun foregroundMillisToday(now: Long = System.currentTimeMillis()): Map<String, Long> {
-        val events = manager.queryEvents(UsageMath.startOfDay(now), now)
+        val startOfDay = UsageMath.startOfDay(now)
+        val events = manager.queryEvents(startOfDay - LOOKBACK_MILLIS, now)
         val event = UsageEvents.Event()
         val transitions = mutableListOf<ForegroundEvent>()
         while (events.hasNextEvent()) {
@@ -45,9 +53,19 @@ class UsageTracker(context: Context) {
                     transitions += ForegroundEvent(pkg, event.timeStamp, resumed = false)
             }
         }
-        return UsageMath.foregroundMillis(transitions, now)
+        return UsageMath.foregroundMillis(transitions, now, windowStart = startOfDay)
     }
 
     fun minutesToday(packageName: String, now: Long = System.currentTimeMillis()): Int =
         ((foregroundMillisToday(now)[packageName] ?: 0L) / 60_000L).toInt()
+
+    private companion object {
+        /**
+         * How far before midnight to look for the resume of a session still open at it.
+         * A day covers any session that began the previous day. One that began earlier
+         * than that and is still on screen is a screen that was never turned off, and a
+         * daily limit has no sensible answer for it either way.
+         */
+        const val LOOKBACK_MILLIS = 24L * 60 * 60 * 1000
+    }
 }
