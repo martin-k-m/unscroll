@@ -102,6 +102,11 @@ minSdk 26, targetSdk 35.
   optimisation if it stops firing.
 - Detection is a heuristic. It errs towards blocking, so an occasional false positive on an
   adjacent screen is expected. Turn that surface off if it annoys you more than it helps.
+- Foreground time is counted from local midnight, but a session that began before it is not.
+  One that ends after midnight is dropped rather than counted from midnight, and one still on
+  screen produces no event in the window at all, so it is not seen until it ends. Both mean a
+  daily limit under-counts an overnight session, which is the case this app exists for. The two
+  are pinned in `UsageMathTest`; the correct behaviour has not been decided.
 
 ## Licence
 

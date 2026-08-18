@@ -1,0 +1,161 @@
+package me.blinkdev.unscroll.usage
+
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+import java.util.TimeZone
+
+private const val IG = "com.instagram.android"
+private const val YT = "com.google.android.youtube"
+private const val MINUTE = 60_000L
+
+private fun resumed(pkg: String, at: Long) = ForegroundEvent(pkg, at, resumed = true)
+private fun ended(pkg: String, at: Long) = ForegroundEvent(pkg, at, resumed = false)
+
+class UsageMathFoldTest {
+
+    @Test
+    fun `no events means no time for anyone`() {
+        assertEquals(emptyMap<String, Long>(), UsageMath.foregroundMillis(emptyList(), 10 * MINUTE))
+    }
+
+    @Test
+    fun `one closed session counts resume to pause`() {
+        val totals = UsageMath.foregroundMillis(
+            listOf(resumed(IG, 0), ended(IG, 3 * MINUTE)),
+            now = 10 * MINUTE,
+        )
+        assertEquals(mapOf(IG to 3 * MINUTE), totals)
+    }
+
+    @Test
+    fun `separate sessions accumulate`() {
+        val totals = UsageMath.foregroundMillis(
+            listOf(
+                resumed(IG, 0), ended(IG, 2 * MINUTE),
+                resumed(IG, 5 * MINUTE), ended(IG, 9 * MINUTE),
+            ),
+            now = 20 * MINUTE,
+        )
+        assertEquals(mapOf(IG to 6 * MINUTE), totals)
+    }
+
+    @Test
+    fun `a session still open counts up to now`() {
+        val totals = UsageMath.foregroundMillis(listOf(resumed(IG, 4 * MINUTE)), now = 7 * MINUTE)
+        assertEquals(mapOf(IG to 3 * MINUTE), totals)
+    }
+
+    @Test
+    fun `a closed session plus an open one both count`() {
+        val totals = UsageMath.foregroundMillis(
+            listOf(resumed(IG, 0), ended(IG, MINUTE), resumed(IG, 5 * MINUTE)),
+            now = 8 * MINUTE,
+        )
+        assertEquals(mapOf(IG to 4 * MINUTE), totals)
+    }
+
+    @Test
+    fun `interleaved packages are tracked independently`() {
+        val totals = UsageMath.foregroundMillis(
+            listOf(
+                resumed(IG, 0),
+                ended(IG, 2 * MINUTE),
+                resumed(YT, 2 * MINUTE),
+                ended(YT, 3 * MINUTE),
+                resumed(IG, 3 * MINUTE),
+                ended(IG, 4 * MINUTE),
+            ),
+            now = 10 * MINUTE,
+        )
+        assertEquals(mapOf(IG to 3 * MINUTE, YT to MINUTE), totals)
+    }
+
+    @Test
+    fun `a pause with no matching resume contributes nothing`() {
+        // This is what an app foregrounded before midnight looks like: the resume falls outside
+        // the query window, so the whole session is dropped rather than counted from midnight.
+        val totals = UsageMath.foregroundMillis(listOf(ended(IG, 8 * MINUTE)), now = 10 * MINUTE)
+        assertEquals(emptyMap<String, Long>(), totals)
+    }
+
+    @Test
+    fun `an app on screen since before midnight contributes nothing`() {
+        // The other half of the hole above, and the worse half. There the session ends inside
+        // the window and is dropped. Here it has not ended, so the package produces no event in
+        // the window at all and the trailing pass over what is still on screen has nothing to
+        // attribute time to. IG has been foreground since before midnight and is absent below,
+        // while YT, resumed inside the window, is counted. Starting a dropped session at
+        // midnight would close the first hole and leave this one open, because the fix there is
+        // reached from a pause event that never arrives here.
+        val totals = UsageMath.foregroundMillis(
+            listOf(resumed(YT, 2 * MINUTE), ended(YT, 3 * MINUTE)),
+            now = 10 * MINUTE,
+        )
+        assertEquals(mapOf(YT to MINUTE), totals)
+    }
+
+    @Test
+    fun `a stop ends a session the same way a pause does`() {
+        val paused = UsageMath.foregroundMillis(
+            listOf(resumed(IG, 0), ForegroundEvent(IG, 2 * MINUTE, resumed = false)),
+            now = 5 * MINUTE,
+        )
+        assertEquals(mapOf(IG to 2 * MINUTE), paused)
+    }
+
+    @Test
+    fun `a second resume without a pause discards the earlier one`() {
+        val totals = UsageMath.foregroundMillis(
+            listOf(resumed(IG, 0), resumed(IG, 4 * MINUTE), ended(IG, 6 * MINUTE)),
+            now = 10 * MINUTE,
+        )
+        assertEquals(mapOf(IG to 2 * MINUTE), totals)
+    }
+
+    @Test
+    fun `a zero length session records zero rather than dropping the package`() {
+        val totals = UsageMath.foregroundMillis(
+            listOf(resumed(IG, MINUTE), ended(IG, MINUTE)),
+            now = 5 * MINUTE,
+        )
+        assertEquals(mapOf(IG to 0L), totals)
+    }
+}
+
+class UsageMathStartOfDayTest {
+
+    private val utc: TimeZone = TimeZone.getTimeZone("UTC")
+    private val day = 24 * 60 * MINUTE
+
+    @Test
+    fun `midnight itself is its own start of day`() {
+        assertEquals(0L, UsageMath.startOfDay(0L, utc))
+    }
+
+    @Test
+    fun `a moment inside the day rolls back to that day's midnight`() {
+        assertEquals(day, UsageMath.startOfDay(day + 13 * 60 * MINUTE, utc))
+    }
+
+    @Test
+    fun `the last millisecond of a day still belongs to that day`() {
+        assertEquals(0L, UsageMath.startOfDay(day - 1, utc))
+        assertEquals(day, UsageMath.startOfDay(day, utc))
+    }
+
+    @Test
+    fun `start of day is a zoned boundary, not a UTC one`() {
+        val tokyo = TimeZone.getTimeZone("Asia/Tokyo")
+        // 1970-01-02T00:30Z is already 09:30 on the 2nd in Tokyo.
+        val instant = day + 30 * MINUTE
+        assertEquals(day, UsageMath.startOfDay(instant, utc))
+        assertEquals(day - 9 * 60 * MINUTE, UsageMath.startOfDay(instant, tokyo))
+    }
+
+    @Test
+    fun `start of day never runs ahead of now`() {
+        val now = System.currentTimeMillis()
+        assertTrue(UsageMath.startOfDay(now, utc) <= now)
+    }
+}
