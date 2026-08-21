@@ -50,10 +50,23 @@ the service off in Accessibility settings, which takes enough taps to count as a
 
 There are no signed releases yet. Grab the debug APK from the latest
 [build run](../../actions/workflows/build.yml) artifact, which needs a GitHub
-login to download and expires after 90 days, or build it yourself:
+login to download and expires after 90 days, or build it yourself.
+
+Building needs a JDK 17 or later and an Android SDK with platform 35 and
+build-tools 35 installed. The Gradle wrapper fetches Gradle itself, but it does
+not fetch either of those. Point the build at the SDK with `ANDROID_HOME`, or
+write `sdk.dir` into a `local.properties` file, which is gitignored:
 
 ```bash
+export ANDROID_HOME=$HOME/Android/Sdk    # wherever yours lives
 ./gradlew :app:assembleDebug
+```
+
+The unit tests are plain JVM tests and need no device or emulator, though the
+Android plugin still wants the SDK above to configure the project:
+
+```bash
+./gradlew :app:testDebugUnitTest
 ```
 
 Then on the device:
