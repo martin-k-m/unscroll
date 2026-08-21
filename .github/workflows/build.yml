@@ -19,6 +19,19 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # The detection rules and the day-accounting arithmetic are under test,
+      # and until now nothing ran those tests on a push. A rule that stops
+      # matching is exactly the regression this repository cannot see by eye.
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/testDebugUnitTest
+          if-no-files-found: ignore
+
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
 
